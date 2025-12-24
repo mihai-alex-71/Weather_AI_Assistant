@@ -23,7 +23,7 @@ Run:
 ```bash
 python retrieve_data.py
 ```
-**make sure you have around 200 MB storage at your directory**
+**make sure you have around 2GB storage at your directory**
 - This script calls the historical weather API for each configured Romanian city 
 - It saves one CSV file per city .
 
@@ -36,6 +36,27 @@ python merge_data.py
 ```
 - this script will simply adds all csv files on top of one another and make the mega data set which later we can use for training the model.
 
+## Step 3 – Build supervised training dataset
+
+After the merged CSV is created (e.g. `weather_romania_38_cities_2021_2025.csv`), run:
+
+```bash
+python build_trainingset.py
+```
+
+
+This script:
+
+- Sorts data by `city_id` and `time`, then builds **sliding windows** per city.
+- Uses the **past 24 hours** of all core features as inputs:
+  - all features plus,
+- `hour`, `dayofweek`, `month`.
+- Creates **targets** for horizons 1–6 hours ahead:
+  - `target_wind_speed_h1..h6`
+  - `target_temperature_h1..h6`
+  - `target_precipitation_h1..h6`
+  - `target_wmo_class_h1..h6` (categorical weather condition derived from WMO code).
+- Saves the final supervised dataset as `training_6h_dataset.csv`.
 
 
 
