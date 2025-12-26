@@ -55,11 +55,49 @@ This script:
   - `target_wind_speed_h1..h6`
   - `target_temperature_h1..h6`
   - `target_precipitation_h1..h6`
-  - `target_wmo_class_h1..h6` (categorical weather condition derived from WMO code).
-- Saves the final supervised dataset as `training_6h_dataset.csv`.
+  - `target_wmo_class_h1..h6`
+- Saves the data by smaller chunks in npy files (x - input) and (y - target)
 
 
 
+## Step 4 – Training a LSTM model
+
+After the `.npy` chunks are created (e.g. `X_train_part_*.npy`, `y_train_part_*.npy`), run:
+
+
+```bash
+python training.py
+```
+
+
+This script:
+
+- Streams chunked `.npy` files through a `tf.data.Dataset` so training fits in RAM.
+- Uses a **LSTM encoder–decoder** to predict the next 6 hours for all targets. 
+- Trains two heads simultaneously:
+  - `regression`: temperature, precipitation, wind speed (MSE + MAE).
+  - `classification`: WMO weather class for each future hour (sparse categorical cross-entropy + accuracy).
+- Shuffles, batches, applies early stopping and learning‑rate scheduling, and saves the best model to `weather_lstm_6h_checkpoint.keras`.
+- epochs is set to 30 but the model wills stop training when is decent trained after some iteration
 
 
 
+## Step 5 – Prediction
+
+After training, run:
+
+```bash
+python prediction.py
+```
+
+
+This script:
+
+- Loads the trained model and scalers.  
+- Gets the selected city’s coordinates via the **Open‑Meteo API**.  
+- Downloads the last **24 hours** of data, computes extra features, and scales inputs.  
+- Runs `model.predict()` to generate 6‑hour forecasts for:
+  - Temperature, wind, precipitation (regression).  
+  - Weather condition (classification).  
+- Applies small corrections using the last measured values. 
+**note : the prediction is not quitely accurate** 
