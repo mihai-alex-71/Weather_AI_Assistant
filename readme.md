@@ -50,7 +50,7 @@ This script:
 - Sorts data by `city_id` and `time`, then builds **sliding windows** per city.
 - Uses the **past 24 hours** of all core features as inputs:
   - all features plus,
-- `hour`, `dayofweek`, `month`.
+- `hour`, `dayofyear`, 'solar_approx' (approximated) 
 - Creates **targets** for horizons 1–6 hours ahead:
   - `target_wind_speed_h1..h6`
   - `target_temperature_h1..h6`
