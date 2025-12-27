@@ -12,6 +12,23 @@ from google.adk.models.google_llm import Gemini
 # prediction.py
 import prediction
 
+# speech rec
+import speech_recognition as sr
+from gtts import gTTS
+
+
+def transcribe(path: str) -> str:
+    r = sr.Recognizer()
+    with sr.AudioFile(path) as source:
+        audio = r.record(source)
+
+    return r.recognize_google(audio,  language="en-US")
+
+
+def text_to_speech(text: str, out_path: str):
+    tts = gTTS(text=text, lang="en")
+    tts.save(out_path)
+
 
 # Load environment variables
 load_dotenv()
@@ -78,6 +95,9 @@ async def main():
     current_session_id = session.id
     print(f"DEBUG: Session Created with ID: {current_session_id}")
 
+    audio_dir = "audio_folder"
+    audio_path = os.path.join(audio_dir, "audio.wav")
+    reply_path = os.path.join(audio_dir, "reply.wav")
     while True:
         try:
             user_input = input("\nUser: ").strip()
@@ -85,10 +105,12 @@ async def main():
                 print("Exiting...")
                 break
 
-            if not user_input:
-                continue
-
             print("... Got it ! thinking...")
+            try:
+                user_input = transcribe(audio_path)
+            except Exception as e:
+                print("transcription failed", e)
+                continue
 
             # Prepare the content object (Multimodal structure)
             user_content = types.Content(
@@ -105,6 +127,7 @@ async def main():
                 if event.content and event.content.parts:
                     for part in event.content.parts:
                         if part.text:
+                            text_to_speech(part.text, reply_path)
                             print(f"Agent: {part.text}")
 
         except Exception as e:
