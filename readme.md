@@ -109,13 +109,16 @@ This script:
 
 
 ## step 6 - audio
-you shall add a `audio.wav` file  in the directory of **audio_folder** concisting of your query -> (e,g : how is the weather in Brasov ?)
-then after pressing enter after you run :
+Add your query as (audio) in `audio_folder/audio.wav` (e.g. “How is the weather in Brasov?”).
+and then:
+run the application :
+
 ```bash
 python app.py
 ```
 
-- the audio will be transcribed to text using speech_recognition
+On Enter:
+- The app transcribes `audio.wav` to text using `speech_recognition`.
+- The transcribed text is sent to the weather agent, which generates a weather reply.  
+- The reply text is converted to speech using *gTTS* and saved as `audio_folder/reply.wav`
 
-
-- the audio will be transcribed (using gtts) and given to the agent and agent's respond will also be transformed to audio in folder of **audio_folder** and saved as `reply.wav`
