@@ -82,22 +82,29 @@ This script:
 
 
 
-## Step 5 – Prediction
+## Step 5 – Prediction and agentic workflow
 
 After training, run:
 
 ```bash
-python prediction.py
+python app.py
 ```
 
 
 This script:
 
-- Loads the trained model and scalers.  
-- Gets the selected city’s coordinates via the **Open‑Meteo API**.  
-- Downloads the last **24 hours** of data, computes extra features, and scales inputs.  
-- Runs `model.predict()` to generate 6‑hour forecasts for:
-  - Temperature, wind, precipitation (regression).  
-  - Weather condition (classification).  
-- Applies small corrections using the last measured values. 
+- Loads the prediction.py file, following the trained model and scalers.  
+- extract the city name from user query or default Bucharest.
+- send the city name and start analysing using functions in `prediction.py`
+- in prediction file :
+  - Gets the selected city’s coordinates via the **Open‑Meteo API**.  
+  - Downloads the last **24 hours** of data, computes extra features, and scales inputs.  
+  - Runs `model.predict()` to generate 6‑hour forecasts for:
+    - Temperature, wind, precipitation (regression).  
+    - Weather condition (classification).  
+  - Applies small corrections using the last measured values. 
+- the agent will announce the predicted weather, suggesting the user about his/her cloths using gemini reasoning.
 **note : the prediction is not quitely accurate** 
+
+
+

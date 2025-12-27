@@ -39,15 +39,15 @@ def get_data_city(city):
         "name": city
     }
     try:
-        response = requests.get(base_url, params=params)
+        response = requests.get(base_url, params=params, timeout=10)
         response.raise_for_status()
         data = response.json()
     except Exception as e:
         print(f"cannot get geo correlations for the city provided: {e}")
         return None
     if "results" not in data or len(data["results"]) == 0:
-        print("No results found for this city")
-        return None
+        print("No results found for this ", city)
+        return None, " no result found ..."
 
     result = data["results"][0]
 
@@ -56,7 +56,7 @@ def get_data_city(city):
     elev = result.get('elevation')
     print(
         f"got the {city}'s correlations. now searching for its weather nalysis for past 24h")
-    return lat, lon, elev
+    return (lat, lon, elev), None
 
 
 def get_live_data():
@@ -83,7 +83,7 @@ def get_live_data():
         data = response.json()
     except Exception as e:
         print(f"API Error: {e}")
-        return None
+        return None, "weather API error"
 
     df = pd.DataFrame(data['hourly'])
     df['time'] = pd.to_datetime(df['time'])
@@ -92,15 +92,15 @@ def get_live_data():
     df['longitude'] = CURRENT_LON
     df['elevation'] = CURRENT_ELEV
 
-    now = datetime.now().replace(minute=0, second=0, microsecond=0)
+    now = datetime.utcnow().replace(minute=0, second=0, microsecond=0)
     df_hist = df[df['time'] < now].tail(PAST_HOURS).copy()
 
     if len(df_hist) < 24:
         print(f"Error: Not enough data. Needed 24 rows, got {len(df_hist)}")
-        return None
+        return None, " not enough data"
 
     # print(df_hist.tail(24))
-    return df_hist.reset_index(drop=True)
+    return df_hist.reset_index(drop=True), None
 
 
 def preprocess_data(df, scaler):
@@ -139,8 +139,8 @@ def preprocess_data(df, scaler):
     X_seq = np.concatenate([step_mat, time_mat, static_mat], axis=1)
 
     last_raw_values = {
-        "temp": df['temperature_2m'].iloc[-1],
-        "wind": df['wind_speed_10m'].iloc[-1]
+        "temp": float(df['temperature_2m'].iloc[-1]),
+        "wind": float(df['wind_speed_10m'].iloc[-1])
     }
 
     return X_seq.reshape(1, PAST_HOURS, 16), df['time'].iloc[-1], last_raw_values
@@ -171,7 +171,7 @@ def decode_weather_smart(probs):
     return mapping.get(idx, "Unknown")
 
 
-def main():
+def predict_weather(city: str) -> dict:
     global CURRENT_LAT, CURRENT_LON, CURRENT_ELEV
 
     print("WEATHER PREDICTOR :")
@@ -185,25 +185,20 @@ def main():
         print(f"Error loading files: {e}")
         return
 
-    city_input = input(
-        "Enter city name (e.g., Bucharest, Vaslui, Cluj): ").strip()
-    if city_input.lower() == "here":
-        city_input = "Bucharest"
-    elif not city_input:
-        print("No city ", city_input, " exists! - auto calculating for Bucharest")
-        city_input = "Bucharest"
-
-    coords = get_data_city(city_input)
-    if coords is None:
-        return
+    coords, error = get_data_city(city)
+    if error:
+        return {"status": "error", "message": error}
 
     CURRENT_LAT, CURRENT_LON, CURRENT_ELEV = coords
 
-    df = get_live_data()
-    if df is None:
-        return
+    df, error = get_live_data()
+    if error:
+        return {"status": "error", "message": error}
 
-    X_input, last_ts, last_raw = preprocess_data(df, scaler)
+    try:
+        X_input, last_ts, last_raw = preprocess_data(df, scaler)
+    except Exception as e:
+        return {"status": "error", "message": f"Preprocessing error: {e}"}
 
     print("Predicting...")
     preds = model.predict(X_input, verbose=0)
@@ -224,27 +219,28 @@ def main():
     temp_offset = (last_raw['temp'] - pred_temp[0]) * 0.9
     wind_offset = (last_raw['wind'] - pred_wind[0]) * 0.8
 
-    print("="*70)
-    print("prediction for ", city_input)
-    print(f"{'Time':<10} | {'Temp (°C)':<10} | {'Wind (km/h)':<12} | {'Precip (mm)':<12} | {'Condition'}")
-    print("-" * 70)
+    forecast_data = []
 
     for i in range(FUTURE_HORIZON):
-        label = f"+{i+1} hour"
-
         corrected_temp = pred_temp[i] + temp_offset
-        corrected_wind = pred_wind[i] + wind_offset
-
-        wind = max(0.0, corrected_wind)
+        corrected_wind = max(0.0, pred_wind[i] + wind_offset)
         precip = max(0.0, pred_precip[i])
-
         cond = decode_weather_smart(cls_pred[i])
 
-        print(
-            f"{label:<10} | {corrected_temp:<10.1f} | {wind:<12.1f} | {precip:<12.2f} | {cond}")
+        forecast_data.append({
+            "hour": i + 1,
+            "temp_c": float(round(corrected_temp, 1)),
+            "wind_kmh": float(round(corrected_wind, 1)),
+            "precip_mm": float(round(precip, 2)),
+            "condition": cond
+        })
 
-    print("="*70)
-
-
-if __name__ == "__main__":
-    main()
+    return {
+        "status": "success",
+        "city_name": city,
+        "current_observation": {
+            "temp": last_raw['temp'],
+            "wind": last_raw['wind']
+        },
+        "forecast": forecast_data
+    }
